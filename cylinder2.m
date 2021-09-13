@@ -49,6 +49,7 @@ end
 
 face_change = zeros(NX-1,NY-1);
 numofmarkedboxes = 0;
+insidePEC = 0; % marks how many squares are.
 % now to mark the actual boxes that must be changed
 % NOTE: This implimentation will not work if cylinder center is on
 % an actual grid point. It was not something considered here. 
@@ -62,6 +63,7 @@ for i = 1:NX-1
                 && face_index(i, j+1) <= 0 ...
                 && face_index(i+1 , j+1) <= 0)
             face_change(i,j) = -1;
+            insidePEC = insidePEC+1;
         
         % Is it Outside PEC
         else if (face_index(i,j) > 0 ...
@@ -84,9 +86,8 @@ end
 
 
 counter = 1;
-cross = zeros(4, numofmarkedboxes);
-lengths = zeros(4, numofmarkedboxes);
-grid_lengths = zeros(4, numofmarkedboxes);
+cross = zeros(4, numofmarkedboxes + insidePEC);
+lengths = zeros(4, numofmarkedboxes + insidePEC);
 for i = 1:NX-1
     for j = 1:NY-1
         
@@ -97,9 +98,14 @@ for i = 1:NX-1
         
         % If the grid block is inside the PEC we set 'cross' = 0.
         if(face_change(i,j) == -1)
-            cross(1, counter) = 0;
-            cross(2, counter) = 0;
+            cross(1, counter) = -2;
+            cross(2, counter) = -2;
+            cross(3, counter) = -2;
+            cross(4, counter) = -2;
+            counter = counter + 1;
         end
+        
+        % If we need to conform then we solve for each side of square.
         if(face_change(i,j) == 0)
             % Solving for x-coordinate of crosspoints on x-axis of the box.
             if(x1 < x_c) 
@@ -120,30 +126,42 @@ for i = 1:NX-1
             end
             
             % Checking validity of values found for xi, yi.
-            if(cross(1, counter) > x2 ...
+            if(cross(1, counter) == -2) cross(1, counter) = 0;
+            else if(cross(1, counter) > x2 ...
                     || cross(1, counter) < x1 ...
                     || imag(cross(1, counter))~=0) %isreal returns 0 if imaginary
                 cross(1, counter) = -1;
+                end
+            % this line deals with special case where upper side is outside
+            % but inner side is inside PEC. 
+            if(cross(1, counter) == -1 && abs(y_c - (j-1)*dy) < radius)
+                cross(1, counter) = 0;
+            end
             end
             
-            if(cross(2, counter) > x2 ...
+            if(cross(2, counter) == -2) cross(2, counter) = 0;
+            else if(cross(2, counter) > x2 ...
                     || cross(2, counter) < x1 ...
                     || imag(cross(2, counter))~=0) %isreal returns 0 if imaginary
                 cross(2, counter) = -1;
             end
+            end
             
-            if(cross(3, counter) > y2 ...
+            if(cross(3, counter) == -2) cross(3, counter) = 0;
+            else if(cross(3, counter) > y2 ...
                     || cross(3, counter) < y1 ...
                     || imag(cross(3, counter))~=0) %isreal returns 0 if imaginary
                 cross(3, counter) = -1;
             end
+            end
             
-            if(cross(4, counter) > y2 ...
+            if(cross(4, counter) == -2) cross(4, counter) = 0;
+            else if(cross(4, counter) > y2 ...
                     || cross(4, counter) < y1 ...
                     || imag(cross(4, counter))~=0) %isreal returns 0 if imaginary
                 cross(4, counter) = -1;
             end
-            
+            end
             % At this point the coordinates are solved and stored
             % Now the next part finds the fractional lengths
             
@@ -157,6 +175,7 @@ for i = 1:NX-1
             else
                 lengths(1,counter) = x2 - cross(1,counter);
                 end
+                end
             end
             
             if(cross(2,counter)==-1) % upper side of box
@@ -167,6 +186,7 @@ for i = 1:NX-1
                 lengths(2,counter) = cross(2,counter)-x1;
             else
                 lengths(2,counter) = x2 - cross(2,counter);
+                end
                 end
             end
             
@@ -179,16 +199,18 @@ for i = 1:NX-1
             else
                 lengths(3,counter) = y2 - cross(3,counter);
                 end
+                end
             end
             
             if(cross(4,counter)==-1) % right side of box
                 lengths(4,counter) = dy;
-            else if(cross(1,counter)==0)
-                    lengths(1,counter) = 0;
+            else if(cross(4,counter)==0)
+                    lengths(4,counter) = 0;
             else if(y1 < y_c) 
                 lengths(4,counter) = cross(4,counter)-y1;
             else
                 lengths(4,counter) = y2 - cross(4,counter);
+                end
                 end
             end
 
@@ -198,12 +220,12 @@ for i = 1:NX-1
 end
 
 % fractional lengths array
-frac_length = zeros(4, numofmarkedboxes);
-frac_length(1:2,1:numofmarkedboxes) = lengths(1:2,1:numofmarkedboxes)/dx;
-frac_length(3:4,1:numofmarkedboxes) = lengths(3:4,1:numofmarkedboxes)/dy;
+frac_length = zeros(4, numofmarkedboxes + insidePEC);
+frac_length(1:2,1:numofmarkedboxes+ insidePEC) = lengths(1:2,1:numofmarkedboxes+ insidePEC)/dx;
+frac_length(3:4,1:numofmarkedboxes+ insidePEC) = lengths(3:4,1:numofmarkedboxes+ insidePEC)/dy;
 
 % fractional area
-Area = zeros(1, numofmarkedboxes);
+Area = zeros(1, numofmarkedboxes );
 FA = zeros(1,numofmarkedboxes); % Fractional areas
 calculate_frac_area2;
 FA = Area / (dx*dy);
@@ -213,14 +235,14 @@ epx_mask = zeros(5,6);
 for i = 1:NX-1
     for j = 1:NY
         % use epx_mask and use the lower side fractional length
-        if(mask(i,j) == 0)
+        if(mask(i,j) == 0 || mask(i,j) == -1)
             epx_mask(i,j) = frac_length(1, counter);
             counter = counter + 1;
-        else if(mask(i,j) == -1)
-                epx_mask(i,j) = 0;
+%         else if(mask(i,j) == -1)
+%                 epx_mask(i,j) = 0;
             else 
                 epx_mask(i,j) = 1;
             end
         end
     end
-end
+% end
