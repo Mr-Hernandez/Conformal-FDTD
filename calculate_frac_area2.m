@@ -1,13 +1,19 @@
 % Calculating the Fractional Areas
 
-hit = zeros(1,numofmarkedboxes); % tally used for 5 node boxes
-m = zeros(1,numofmarkedboxes); % tallies nodes for each box.
-nodes = zeros(2, 5, numofmarkedboxes);
+hit = zeros(1,numofmarkedboxes+ insidePEC); % tally used for 5 node boxes
+m = zeros(1,numofmarkedboxes+ insidePEC); % tallies nodes for each box.
+nodes = zeros(2, 5, numofmarkedboxes+ insidePEC); % Marks position of nodes
 
 box_n = 1;
 for i = 1:NX-1
     for j = 1:NY-1
-        
+         % First check if we are inside PEC
+         if (face_change(i,j) == -1)
+             m(box_n) = m(box_n)+1; % No nodes, or inside PEC
+             nodes(1, m(box_n), box_n) = 0;
+             nodes(2, m(box_n), box_n) = 0;
+             box_n = box_n + 1;
+         end
          % Does this box need a fractional area found?
          if(face_change(i,j) == 0)
                           
@@ -92,13 +98,17 @@ end
  % node(first coord:2ndcoord, node index for 1 box, box number)
  % diff(nodes(1:2,3,1), nodes(1:2,4,1)) %
  
+ 
  % Here we use the number of nodes on or outside the circle to determine
  % which method to use to approximate the area in the circle.
  % 3 nodes: Approximate using a triangle
  % 4 nodes: Approximate using a rectangle
  % 5 nodes: Approximate using 3 triangles
- for box_n = 1:numofmarkedboxes
+ for box_n = 1:numofmarkedboxes+insidePEC
      switch m(box_n)
+%          case 0 
+%              disp('c-1')
+%              Area(box_n) = 0;
          case 3
              disp('c');
 %              aa = diff(nodes(1:2,1,box_n), nodes(1:2,2,box_n));
@@ -108,11 +118,17 @@ end
 %              Area(box_n) = sqrt(ss*(ss-aa)*(ss-bb)*(ss-cc));
                Area(box_n) = tri_area(nodes(1:2,1,box_n), nodes(1:2,2,box_n), ...
                    nodes(1:2,3,box_n));
+%                if(cross(1,box_n) == 0)
+%                    Area(box_n) = (dx*dy) - Area(box_n);
+%                end
          case 4
              disp('c2');
              aa = diff(nodes(1:2,1,box_n), nodes(1:2,2,box_n));
              bb = diff(nodes(1:2,2,box_n), nodes(1:2,3,box_n));
              Area(box_n) = aa*bb;
+%              if(cross(1,box_n) == 0)
+%                    Area(box_n) = (dx*dy) - Area(box_n);
+%              end
          case 5
              switch hit(box_n)
                  case 1
@@ -122,7 +138,9 @@ end
                                    nodes(1:2,5,box_n)) ...
                      + tri_area(nodes(1:2,3,box_n), nodes(1:2,4,box_n), ...
                                    nodes(1:2,5,box_n));
-                    
+%                     if(cross(1,box_n) == 0)
+%                         Area(box_n) = (dx*dy) - Area(box_n);
+%                     end
                  case 2
                      Area(box_n) = tri_area(nodes(1:2,1,box_n), nodes(1:2,2,box_n), ... 
                                    nodes(1:2,5,box_n)) ...
@@ -130,7 +148,9 @@ end
                                    nodes(1:2,5,box_n)) ...
                      + tri_area(nodes(1:2,3,box_n), nodes(1:2,4,box_n), ...
                                    nodes(1:2,5,box_n));
-                               
+%                     if(cross(1,box_n) == 0)
+%                         Area(box_n) = (dx*dy) - Area(box_n);
+%                     end         
                  case 3
                      Area(box_n) = tri_area(nodes(1:2,1,box_n), nodes(1:2,2,box_n), ...
                                    nodes(1:2,3,box_n)) ...
@@ -138,6 +158,9 @@ end
                                    nodes(1:2,4,box_n)) ...
                      + tri_area(nodes(1:2,1,box_n), nodes(1:2,4,box_n), ...
                                    nodes(1:2,5,box_n));
+%                      if(cross(1,box_n) == 0)
+%                         Area(box_n) = (dx*dy) - Area(box_n);
+%                      end
                  case 4
                      Area(box_n) = tri_area(nodes(1:2,1,box_n), nodes(1:2,2,box_n), ...
                                    nodes(1:2,5,box_n)) ...
@@ -145,6 +168,17 @@ end
                                    nodes(1:2,5,box_n)) ...
                      + tri_area(nodes(1:2,2,box_n), nodes(1:2,3,box_n), ...
                                    nodes(1:2,4,box_n));
+%                     if(cross(1,box_n) == 0)
+%                         Area(box_n) = (dx*dy) - Area(box_n);
+%                     end
+             end
+             % This deals with the special case where the area inside the
+             % PEC is measured, so we find the difference with by
+             % subtracting the Area of the grid square inside the PEC from
+             % the full grid square area 'dx*dy'.
+             % Introduces 5% error in final Fractional Area readings.
+             if(cross(1,box_n) == 0)
+                   Area(box_n) = (dx*dy) - Area(box_n);
              end
      end
              
