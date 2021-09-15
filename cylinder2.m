@@ -46,14 +46,15 @@ for i = 1:NX
 end
 
 
-
+% We'll want to mark how many squares need to be changed and in this we 
+% will also mark how many are inside the circle so we can change their
+% values to 0, or something else if they are not PEC's later on.
 face_change = zeros(NX-1,NY-1);
 numofmarkedboxes = 0;
 insidePEC = 0; % marks how many squares are.
-% now to mark the actual boxes that must be changed
 % NOTE: This implimentation will not work if cylinder center is on
 % an actual grid point. It was not something considered here. 
-mask = ones(5,6)*2;
+mask = ones(NX-1,NY)*2;
 for i = 1:NX-1
     for j = 1:NY-1
         
@@ -84,19 +85,27 @@ for i = 1:NX-1
 end
 
 
-
+% In this for loop what we do for now is find whether the lower side of 
+% the grid square is to be conformed and whether it is inside or outside 
+% of the PEC. 
+% So we cycle through each grid square and use its lower length (as in
+% bottom, not value) to create an NX-1 by NY mask which we will then be
+% able to use in the E-update equations or apply it to the epsilon vector
+% directly, though the second method may not work for non PEC material.
 counter = 1;
 cross = zeros(4, numofmarkedboxes + insidePEC);
 lengths = zeros(4, numofmarkedboxes + insidePEC);
 for i = 1:NX-1
     for j = 1:NY-1
         
+        % The coordinates of the current grid square
         x1 = (i-1)*dx;
         x2 = i*dx;
         y1 = (j-1)*dy;
         y2 = j*dy;
         
-        % If the grid block is inside the PEC we set 'cross' = 0.
+        % If the grid block is inside the PEC we set 'cross' = -2.
+        % so we can identify it later
         if(face_change(i,j) == -1)
             cross(1, counter) = -2;
             cross(2, counter) = -2;
@@ -126,7 +135,7 @@ for i = 1:NX-1
             end
             
             % Checking validity of values found for xi, yi.
-            if(cross(1, counter) == -2) cross(1, counter) = 0;
+            if(cross(1, counter) == -2) cross(1, counter) = 0; % case if inside PEC
             else if(cross(1, counter) > x2 ...
                     || cross(1, counter) < x1 ...
                     || imag(cross(1, counter))~=0) %isreal returns 0 if imaginary
@@ -225,24 +234,28 @@ frac_length(1:2,1:numofmarkedboxes+ insidePEC) = lengths(1:2,1:numofmarkedboxes+
 frac_length(3:4,1:numofmarkedboxes+ insidePEC) = lengths(3:4,1:numofmarkedboxes+ insidePEC)/dy;
 
 % fractional area
-Area = zeros(1, numofmarkedboxes );
-FA = zeros(1,numofmarkedboxes); % Fractional areas
+Area = zeros(1, numofmarkedboxes+ insidePEC );
+FA = zeros(1,numofmarkedboxes+ insidePEC); % Fractional areas
 calculate_frac_area2;
 FA = Area / (dx*dy);
 
 counter = 1;
-epx_mask = zeros(5,6);
+epx_mask = zeros(NX-1,NY);
+muz_mask = zeros(NX-1,NY-1); % H-fields coming out of z-plane.
 for i = 1:NX-1
     for j = 1:NY
         % use epx_mask and use the lower side fractional length
         if(mask(i,j) == 0 || mask(i,j) == -1)
             epx_mask(i,j) = frac_length(1, counter);
+            if(j < NY)
+                muz_mask(i,j) = FA(counter);
+            end
             counter = counter + 1;
-%         else if(mask(i,j) == -1)
-%                 epx_mask(i,j) = 0;
             else 
                 epx_mask(i,j) = 1;
+                if(j < NY)
+                    muz_mask(i,j) = 1;
+                end
             end
         end
-    end
-% end
+end
