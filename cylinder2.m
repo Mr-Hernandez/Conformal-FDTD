@@ -141,11 +141,14 @@ for i = 1:NX-1
                     || imag(cross(1, counter))~=0) %isreal returns 0 if imaginary
                 cross(1, counter) = -1;
                 end
-            % this line deals with special case where upper side is outside
-            % but inner side is inside PEC. 
-            if(cross(1, counter) == -1 && abs(y_c - (j-1)*dy) < radius)
-                cross(1, counter) = 0;
-            end
+            % This if statement deals with the special case where there were no crosspoints
+            % on the lower or upper sides of the grid square. It determines
+            % if the lower side of the grid square is completely inside or
+            % outside the PEC circle.
+              if(cross(1, counter) == -1 && sqrt((x_c - (i-1)*dx)^2 ...
+                  + (y_c - (j-1)*dy)^2) < radius)
+                  cross(1, counter) = 0;
+              end
             end
             
             if(cross(2, counter) == -2) cross(2, counter) = 0;
@@ -258,4 +261,13 @@ for i = 1:NX-1
                 end
             end
         end
+end
+
+% Here we copy the first side of the epx_mask and muz_mask to the second
+% half. Use for testing different methods and their outcomes for now.
+muz_mask2 = muz_mask;
+for i = 1:NX-1
+    for j =  1:((NY+1)/2)-1 %only for even NXYZ initial values.
+        muz_mask2(i,NX-j) = muz_mask(i,j);
+    end
 end
